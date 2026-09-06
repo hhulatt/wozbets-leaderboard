@@ -1,0 +1,362 @@
+/* WozBets — monthly Rainbet wager leaderboard.
+   Data is a static JSON snapshot refreshed by a scheduled job; nothing here
+   touches the Rainbet API directly, so the affiliate key never reaches a browser.
+
+   GENERATED FILE. The cycle constants below are written by new-creator.mjs from
+   creators/wozbets.json, which is also what writes them into
+   scripts/fetch-leaderboard.mjs. Editing them here alone makes the countdown
+   disagree with the data — change the config and regenerate instead. */
+(() => {
+  'use strict';
+
+  /* --8<-- pure logic: constants, timezone maths and the cycle model.
+     test/run-tests.mjs extracts everything between these fences verbatim and
+     table-tests it, so the code under test is the code that ships. --8<-- */
+  const TZ = 'Europe/London';
+  /** 'monthly' = 1st to the last day of the month. 'offset' = day N to day N-1 of the next month. */
+  const CYCLE_MODE = 'monthly';
+  const CYCLE_START_DAY = 1;
+  const DATA_URL = 'data/leaderboard.json';
+  const HISTORY_INDEX_URL = 'data/history/index.json';
+
+  const $ = (id) => document.getElementById(id);
+
+  const money = new Intl.NumberFormat('en-US', {
+    style: 'currency', currency: 'USD', maximumFractionDigits: 0,
+  });
+  const moneyExact = new Intl.NumberFormat('en-US', {
+    style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2,
+  });
+
+  /* ---------- Timezone helpers ---------------------------------------- */
+
+  /** How far the given zone is from UTC at a specific instant, in ms. */
+  function zoneOffsetMs(instant, timeZone) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone, hour12: false,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+    }).formatToParts(instant);
+    const f = {};
+    for (const p of parts) f[p.type] = p.value;
+    const asUtc = Date.UTC(+f.year, +f.month - 1, +f.day, +f.hour % 24, +f.minute, +f.second);
+    return asUtc - instant.getTime();
+  }
+
+  /** UTC timestamp for a wall-clock midnight in the leaderboard's timezone. */
+  function zonedMidnight(year, month, day) {
+    const naive = Date.UTC(year, month - 1, day);
+    let ts = naive;
+    // Two passes settle the DST edge cases around the shift itself.
+    for (let i = 0; i < 2; i++) ts = naive - zoneOffsetMs(new Date(ts), TZ);
+    return ts;
+  }
+
+  /** Today's calendar date in the leaderboard's timezone. */
+  function zonedToday() {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date());
+    const get = (t) => Number(parts.find((p) => p.type === t).value);
+    return { year: get('year'), month: get('month'), day: get('day') };
+  }
+
+  /* ---------- Cycle model ---------------------------------------------- */
+
+  const pad = (n) => String(n).padStart(2, '0');
+  const nextMonth = (y, m) => (m === 12 ? { year: y + 1, month: 1 } : { year: y, month: m + 1 });
+  /** Day count of a month. Date.UTC(y, m, 0) is the last day of month m (1-based). */
+  const daysInMonth = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+
+  /** Midnight at the start of the cycle after the one containing `today`. */
+  function nextResetTs(today) {
+    const { year, month, day } = today;
+    if (CYCLE_MODE === 'monthly') {
+      const n = nextMonth(year, month);
+      return zonedMidnight(n.year, n.month, 1);
+    }
+    if (day < CYCLE_START_DAY) return zonedMidnight(year, month, CYCLE_START_DAY);
+    const n = nextMonth(year, month);
+    return zonedMidnight(n.year, n.month, CYCLE_START_DAY);
+  }
+
+  /** "1 - 30 Sep 2026", dropping the year on the start when both match. */
+  function periodLabel(startISO, endISO) {
+    const start = new Date(`${startISO}T00:00:00Z`);
+    const end = new Date(`${endISO}T00:00:00Z`);
+    const fmt = (d, opts) => d.toLocaleDateString('en-GB', { timeZone: 'UTC', ...opts });
+    const sameYear = start.getUTCFullYear() === end.getUTCFullYear();
+    const sameMonth = sameYear && start.getUTCMonth() === end.getUTCMonth();
+    const from = sameMonth
+      ? fmt(start, { day: 'numeric' })
+      : fmt(start, sameYear
+        ? { day: 'numeric', month: 'short' }
+        : { day: 'numeric', month: 'short', year: 'numeric' });
+    return `${from} – ${fmt(end, { day: 'numeric', month: 'short', year: 'numeric' })}`;
+  }
+
+  /* --8<-- end of extracted region --8<-- */
+
+  /* ---------- Countdown ------------------------------------------------ */
+
+  const cd = { d: $('cd-days'), h: $('cd-hours'), m: $('cd-mins'), s: $('cd-secs') };
+  let resetTs = nextResetTs(zonedToday());
+
+  function tickCountdown() {
+    let remaining = resetTs - Date.now();
+    if (remaining <= 0) {
+      // Cycle just rolled over: re-target and pull the fresh board.
+      resetTs = nextResetTs(zonedToday());
+      remaining = Math.max(0, resetTs - Date.now());
+      loadBoard();
+    }
+    const total = Math.floor(remaining / 1000);
+    cd.d.textContent = pad(Math.floor(total / 86400));
+    cd.h.textContent = pad(Math.floor(total / 3600) % 24);
+    cd.m.textContent = pad(Math.floor(total / 60) % 60);
+    cd.s.textContent = pad(total % 60);
+  }
+
+  tickCountdown();
+  setInterval(tickCountdown, 1000);
+
+  /* ---------- Rendering ------------------------------------------------ */
+
+  const MEDALS = ['🥇', '🥈', '🥉'];
+  let board = null;
+  let showingAll = false;
+
+  function renderPodium(entries) {
+    const host = $('podium');
+    const top = entries.slice(0, 3);
+    if (!top.length) { host.innerHTML = ''; return; }
+    host.innerHTML = top.map((e) => `
+      <article class="pod pod--${e.rank}">
+        <div class="pod__medal">${MEDALS[e.rank - 1]}</div>
+        <p class="pod__rank">Rank ${e.rank}</p>
+        <p class="pod__name">${escapeHtml(e.masked)}</p>
+        <p class="pod__wagered">Wagered <strong>${moneyExact.format(e.wagered)}</strong></p>
+        <span class="pod__prize">${money.format(e.prize)}</span>
+      </article>`).join('');
+  }
+
+  function renderRows(entries) {
+    const tbody = $('lb-body');
+    if (!entries.length) {
+      tbody.innerHTML = `<tr class="lb__empty"><td colspan="4">
+        No wagers recorded yet this cycle — be the first on the board.</td></tr>`;
+      return;
+    }
+    const cut = board?.boardSize || 25;
+    const visible = showingAll ? entries : entries.slice(0, cut);
+    const rows = visible.map((e) => `
+      <tr data-hash="${e.hash}" class="${e.prize > 0 ? 'is-top' : ''}">
+        <td><span class="lb__rank">${e.rank}</span></td>
+        <td class="lb__name">${escapeHtml(e.masked)}</td>
+        <td class="num">${moneyExact.format(e.wagered)}</td>
+        <td class="num ${e.prize > 0 ? 'lb__prize' : 'lb__prize--none'}">${e.prize > 0 ? money.format(e.prize) : '—'}</td>
+      </tr>`).join('');
+
+    const hidden = entries.length - visible.length;
+    const toggle = (hidden > 0 || showingAll)
+      ? `<tr class="lb__empty"><td colspan="4">
+           <button class="btn btn--ghost btn--sm" id="toggle-all" type="button">
+             ${showingAll ? 'Show top ' + cut : 'Show all ' + entries.length + ' players'}
+           </button></td></tr>`
+      : '';
+
+    tbody.innerHTML = rows + toggle;
+    const btn = $('toggle-all');
+    if (btn) btn.addEventListener('click', () => { showingAll = !showingAll; renderRows(entries); });
+  }
+
+  /* A place nobody is standing in yet shows a dash, not an amount. With fewer
+     players than paid places, printing "5th $20" would advertise a prize that
+     is not going anywhere this cycle. */
+  function renderPrizes(prizes, playerCount) {
+    $('prize-grid').innerHTML = prizes.map((amount, i) => {
+      const claimed = i < playerCount;
+      return `
+      <li class="prize prize--${i + 1}${claimed ? '' : ' prize--unclaimed'}">
+        <span class="prize__rank">${ordinal(i + 1)}</span>
+        <span class="prize__amt">${claimed ? money.format(amount) : '\u2014'}</span>
+      </li>`;
+    }).join('');
+  }
+
+  function renderBoard(data) {
+    board = data;
+    $('period-label').textContent = periodLabel(data.periodStart, data.periodEnd);
+    $('stat-players').textContent = data.playerCount.toLocaleString('en-GB');
+    $('stat-wagered').textContent = money.format(data.totalWagered);
+    $('updated-at').textContent = new Date(data.updatedAt)
+      .toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: TZ }) + ' UK';
+    renderPodium(data.entries);
+    renderRows(data.entries);
+    renderPrizes(data.prizes, data.playerCount);
+  }
+
+  function ordinal(n) {
+    const s = ['th', 'st', 'nd', 'rd'];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  async function loadBoard() {
+    try {
+      const res = await fetch(`${DATA_URL}?v=${Date.now()}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      renderBoard(await res.json());
+    } catch (err) {
+      console.error('Could not load leaderboard', err);
+      $('lb-body').innerHTML = `<tr class="lb__empty"><td colspan="4">
+        Leaderboard is temporarily unavailable. Please refresh in a moment.</td></tr>`;
+    }
+  }
+
+  /* ---------- Search --------------------------------------------------- */
+
+  /* Rows ship with a hash of the username rather than the username itself, so a
+     player can prove which row is theirs without the board exposing anyone else. */
+  async function hashUsername(name) {
+    const bytes = new TextEncoder().encode(name.trim().toLowerCase());
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return [...new Uint8Array(digest)]
+      .map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
+  }
+
+  const searchResult = $('search-result');
+
+  function setResult(message, state) {
+    searchResult.textContent = message;
+    searchResult.className = `search__result${state ? ' search__result--' + state : ''}`;
+  }
+
+  async function runSearch() {
+    const query = $('search-input').value.trim();
+    document.querySelectorAll('tr.is-you').forEach((tr) => tr.classList.remove('is-you'));
+
+    if (!query) { setResult('Enter your Rainbet username to find your position.', null); return; }
+    if (!board) { setResult('Leaderboard is still loading — try again in a second.', 'miss'); return; }
+    if (!window.crypto?.subtle) {
+      setResult('Search needs a secure (https) connection.', 'miss');
+      return;
+    }
+
+    const hash = await hashUsername(query);
+    const match = board.entries.find((e) => e.hash === hash);
+
+    if (!match) {
+      setResult(`No wagers found for "${query}" this cycle. Make sure you signed up with code WOZBETS and that the spelling matches exactly.`, 'miss');
+      return;
+    }
+
+    // Reveal the whole board if their row sits below the default cut-off.
+    if (match.rank > (board.boardSize || 25) && !showingAll) {
+      showingAll = true;
+      renderRows(board.entries);
+    }
+
+    const prize = match.prize > 0
+      ? ` You're in the money for ${money.format(match.prize)}.`
+      : ` ${money.format(0)} so far — the top 5 wagerers get paid, keep climbing.`;
+    setResult(`${query} — rank #${match.rank} with ${moneyExact.format(match.wagered)} wagered.${prize}`, 'hit');
+
+    const row = document.querySelector(`tr[data-hash="${hash}"]`);
+    if (row) {
+      row.classList.add('is-you');
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  $('search-btn').addEventListener('click', runSearch);
+  $('search-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); runSearch(); }
+  });
+
+  /* ---------- Copy code ------------------------------------------------ */
+
+  const copyBtn = $('copy-code');
+  copyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(copyBtn.dataset.code);
+      copyBtn.textContent = 'Copied!';
+    } catch {
+      copyBtn.textContent = 'Press Ctrl+C';
+    }
+    setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+  });
+
+  /* ---------- Previous cycle winners ----------------------------------- */
+
+  /* Populated from the archived snapshot of each closed cycle. Until the first
+     cycle ends the section stays hidden rather than showing an empty table. */
+  async function loadHistory() {
+    let cycles = [];
+    try {
+      const res = await fetch(`${HISTORY_INDEX_URL}?v=${Date.now()}`, { cache: 'no-store' });
+      if (!res.ok) return;
+      cycles = (await res.json()).cycles || [];
+    } catch { return; }
+    if (!cycles.length) return;
+
+    const select = $('history-select');
+    select.innerHTML = cycles
+      .map((c) => `<option value="${c.id}">${periodLabel(c.start, c.end)}</option>`).join('');
+    // A single closed cycle leaves nothing to choose between.
+    select.hidden = cycles.length < 2;
+    $('history').hidden = false;
+
+    async function showCycle(id) {
+      const champ = $('history-champion');
+      const body = $('history-body');
+      body.innerHTML = `<tr class="lb__empty"><td colspan="4">Loading…</td></tr>`;
+      try {
+        const res = await fetch(`data/history/${encodeURIComponent(id)}.json`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const past = await res.json();
+        const winners = past.entries.filter((e) => e.prize > 0);
+
+        if (!winners.length) {
+          champ.innerHTML = '';
+          body.innerHTML = `<tr class="lb__empty"><td colspan="4">No winners recorded for this cycle.</td></tr>`;
+          return;
+        }
+
+        const [first] = winners;
+        champ.innerHTML = `
+          <div class="champion">
+            <span class="champion__crown">👑</span>
+            <span class="champion__body">
+              <span class="champion__tag">Champion · ${escapeHtml(periodLabel(past.periodStart, past.periodEnd))}</span>
+              <span class="champion__name">${escapeHtml(first.masked)}</span>
+              <span class="champion__meta">${moneyExact.format(first.wagered)} wagered</span>
+            </span>
+            <span class="champion__prize">${money.format(first.prize)}</span>
+          </div>`;
+
+        body.innerHTML = winners.map((e) => `
+          <tr class="is-top">
+            <td><span class="lb__rank">${e.rank}</span></td>
+            <td class="lb__name">${escapeHtml(e.masked)}</td>
+            <td class="num">${moneyExact.format(e.wagered)}</td>
+            <td class="num lb__prize">${money.format(e.prize)}</td>
+          </tr>`).join('');
+      } catch {
+        champ.innerHTML = '';
+        body.innerHTML = `<tr class="lb__empty"><td colspan="4">Could not load this cycle.</td></tr>`;
+      }
+    }
+
+    select.addEventListener('change', () => showCycle(select.value));
+    showCycle(cycles[0].id);
+  }
+
+  loadBoard();
+  loadHistory();
+})();
