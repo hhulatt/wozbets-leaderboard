@@ -18,9 +18,14 @@ GitHub Actions (holds the key)
   -> masks usernames, computes ranks and prizes
   -> writes data/leaderboard.json
   -> commits it to this repo
-  -> Netlify sees the push and redeploys
+  -> GitHub Pages rebuilds on the push
   -> the browser reads static JSON
 ```
+
+GitHub Pages has no per-path cache configuration, so the page fetches its data
+with a unique query string and `cache: 'no-store'`. That is the only thing
+keeping a refreshed board from being served stale off the CDN — do not remove
+it.
 
 The board therefore keeps working if the API is down, and costs nothing to serve.
 
@@ -45,13 +50,16 @@ The board therefore keeps working if the API is down, and costs nothing to serve
 3. **Check the default branch.** Scheduled workflows only run on the
    repository's default branch. If you pushed to anything other than the
    default, the cron will never fire.
-4. **Connect Netlify** to the repo (this needs an interactive login, so a human
-   has to do it). Settings come from `netlify.toml`. Set the production branch
-   to the branch you pushed.
-5. **Point the domain** at Netlify and wait for the TLS certificate. A new
-   custom domain serves Netlify's default certificate for a while — confirm the
-   certificate is actually issued for `wozbets.com` before telling anyone the
-   site is live.
+4. **Turn on GitHub Pages** — Settings → Pages → Source: *Deploy from a
+   branch*, branch `main`, folder `/ (root)`. The repo must be public; Pages
+   will not serve a private repo on a free plan. The `CNAME` file already in
+   this repo sets the custom domain on the first build.
+5. **Point the domain at GitHub.** At your registrar, four A records on the
+   apex — `185.199.108.153`, `185.199.109.153`, `185.199.110.153`,
+   `185.199.111.153` — and a `www` CNAME to `<your-user>.github.io`. Then wait
+   for the certificate: Settings → Pages shows when HTTPS is available, and
+   only then can you tick **Enforce HTTPS**. Do not announce the site before
+   that, or visitors get a certificate warning.
 6. **Run the workflow once by hand** — Actions → Refresh leaderboard → Run
    workflow. Confirm it produces a data commit authored by
    `github-actions[bot]`.
