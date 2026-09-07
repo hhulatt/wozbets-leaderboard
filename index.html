@@ -56,7 +56,7 @@
     </div>
   </section>
 
-  <section class="countdown-wrap" aria-labelledby="countdown-title">
+  <section class="countdown-wrap" id="countdown-wrap" aria-labelledby="countdown-title">
     <h2 id="countdown-title" class="countdown__title">Leaderboard resets in</h2>
     <div class="countdown" id="countdown" role="timer" aria-live="off">
       <div class="unit"><span class="unit__num" id="cd-days">--</span><span class="unit__label">Days</span></div>
@@ -67,7 +67,7 @@
     <p class="countdown__note">Current period: <strong id="period-label">—</strong> · Resets at midnight UK time on the 1st</p>
   </section>
 
-  <section class="stats" aria-label="Competition stats">
+  <section class="stats" id="stats" aria-label="Competition stats">
     <div class="stat"><span class="stat__num" id="stat-pool">$250</span><span class="stat__label">Prize pool</span></div>
     <div class="stat"><span class="stat__num" id="stat-places">5</span><span class="stat__label">Paid places</span></div>
     <div class="stat"><span class="stat__num" id="stat-players">—</span><span class="stat__label">Players competing</span></div>
@@ -76,15 +76,17 @@
 
   <section id="leaderboard" class="board">
     <div class="section-head">
-      <h2>Current leaderboard</h2>
-      <p class="section-sub">Usernames are partially hidden to protect player privacy. Search below to find your own position.</p>
+      <h2 id="board-title">Current leaderboard</h2>
+      <p class="section-sub" id="board-sub">Usernames are partially hidden to protect player privacy. Search below to find your own position.</p>
     </div>
 
     <div class="board-tabs" id="board-tabs" role="tablist" aria-label="Choose a leaderboard" hidden>
       <button class="board-tab is-active" id="tab-monthly" type="button" role="tab" aria-selected="true">Monthly</button>
-      <button class="board-tab" id="tab-weekly" type="button" role="tab" aria-selected="false">Weekly</button>
+      <button class="board-tab" id="tab-weekly" type="button" role="tab" aria-selected="false" hidden>Weekly</button>
+      <button class="board-tab" id="tab-history" type="button" role="tab" aria-selected="false" hidden>Past winners</button>
     </div>
 
+    <div id="live-board">
     <div class="podium" id="podium" aria-label="Top three wagerers"></div>
 
     <div class="search">
@@ -109,23 +111,25 @@
       </table>
     </div>
     <p class="updated">Last updated <span id="updated-at">—</span> · Refreshed automatically every midnight UK time</p>
-  </section>
+    </div>
 
-  <section class="history" id="history" hidden>
-    <div class="section-head">
-      <h2>Previous winners</h2>
-      <p class="section-sub">Final standings from cycles that have closed, straight from Rainbet.</p>
-    </div>
-    <div id="history-champion"></div>
-    <div class="history__controls">
-      <label class="visually-hidden" for="history-select">Choose a cycle</label>
-      <select id="history-select"></select>
-    </div>
-    <div class="table-wrap">
-      <table class="lb lb--history">
-        <thead><tr><th scope="col">Rank</th><th scope="col">Player</th><th scope="col" class="num">Wagered</th><th scope="col" class="num">Prize</th></tr></thead>
-        <tbody id="history-body"></tbody>
-      </table>
+    <div class="history" id="history" hidden>
+      <div class="history__scope" id="history-scope" role="tablist" aria-label="Choose a competition" hidden>
+        <button class="scope-tab is-active" id="scope-monthly" type="button" role="tab" aria-selected="true">Monthly</button>
+        <button class="scope-tab" id="scope-weekly" type="button" role="tab" aria-selected="false">Weekly</button>
+      </div>
+      <div class="history__controls">
+        <label class="visually-hidden" for="history-select">Choose a period</label>
+        <select id="history-select"></select>
+      </div>
+      <p class="history__period">Final standings for <strong id="history-period">—</strong></p>
+      <div id="history-champion"></div>
+      <div class="table-wrap">
+        <table class="lb lb--history">
+          <thead><tr><th scope="col">Rank</th><th scope="col">Player</th><th scope="col" class="num">Wagered</th><th scope="col" class="num">Prize</th></tr></thead>
+          <tbody id="history-body"></tbody>
+        </table>
+      </div>
     </div>
   </section>
 

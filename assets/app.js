@@ -161,19 +161,20 @@
     },
   };
 
-  let view = 'monthly';
+  let view = 'monthly';        // which tab is selected: monthly, weekly or history
+  let boardView = 'monthly';   // which live board the countdown and data belong to
   const cache = {};
 
   const cd = { d: $('cd-days'), h: $('cd-hours'), m: $('cd-mins'), s: $('cd-secs') };
-  let resetTs = VIEWS[view].nextReset(zonedToday());
+  let resetTs = VIEWS[boardView].nextReset(zonedToday());
 
   function tickCountdown() {
     let remaining = resetTs - Date.now();
     if (remaining <= 0) {
       // Cycle just rolled over: re-target and pull the fresh board.
-      resetTs = VIEWS[view].nextReset(zonedToday());
+      resetTs = VIEWS[boardView].nextReset(zonedToday());
       remaining = Math.max(0, resetTs - Date.now());
-      delete cache[view];
+      delete cache[boardView];
       loadBoard();
     }
     const total = Math.floor(remaining / 1000);
@@ -256,7 +257,7 @@
 
   function renderBoard(data) {
     board = data;
-    const word = VIEWS[view].periodWord;
+    const word = VIEWS[boardView].periodWord;
     const places = data.prizes.length;
     $('period-label').textContent = periodLabel(data.periodStart, data.periodEnd);
     $('stat-players').textContent = data.playerCount.toLocaleString('en-GB');
@@ -287,7 +288,7 @@
   }
 
   async function loadBoard() {
-    const active = view;
+    const active = boardView;
     if (cache[active]) { renderBoard(cache[active]); return; }
     try {
       const res = await fetch(`${VIEWS[active].dataUrl}?v=${Date.now()}`, { cache: 'no-store' });
@@ -295,10 +296,10 @@
       const data = await res.json();
       cache[active] = data;
       // The viewer may have switched tabs while this was in flight.
-      if (view === active) renderBoard(data);
+      if (boardView === active && view !== 'history') renderBoard(data);
     } catch (err) {
       console.error('Could not load leaderboard', err);
-      if (view !== active) return;
+      if (boardView !== active || view === 'history') return;
       $('lb-body').innerHTML = `<tr class="lb__empty"><td colspan="4">
         Leaderboard is temporarily unavailable. Please refresh in a moment.</td></tr>`;
     }
@@ -377,106 +378,162 @@
     setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
   });
 
-  /* ---------- Previous cycle winners ----------------------------------- */
+  /* ---------- Past winners --------------------------------------------- */
 
-  /* Populated from the archived snapshot of each closed cycle. Until the first
-     cycle ends the section stays hidden rather than showing an empty table. */
-  async function loadHistory() {
-    const active = view;
-    // Hidden until this view proves it has something to show — a site can have
-    // closed months and no closed weeks, or the other way round.
-    $('history').hidden = true;
-    let cycles = [];
+  /* Closed periods are archived by the workflow, one file each, with an index
+     per competition. Both indexes are read once on load: they decide whether
+     the "Past winners" tab exists at all, so a site with nothing closed yet
+     never offers an empty tab. */
+
+  const historyIndex = { monthly: [], weekly: [] };
+  let historyScope = 'monthly';
+
+  async function loadIndex(which) {
     try {
-      const res = await fetch(`${VIEWS[active].historyIndexUrl}?v=${Date.now()}`, { cache: 'no-store' });
-      if (!res.ok) return;
-      cycles = (await res.json()).cycles || [];
-    } catch { return; }
-    if (!cycles.length || view !== active) return;
+      const res = await fetch(`${VIEWS[which].historyIndexUrl}?v=${Date.now()}`, { cache: 'no-store' });
+      if (!res.ok) return [];
+      return (await res.json()).cycles || [];
+    } catch { return []; }
+  }
 
+  async function showPeriod(id) {
+    const scope = historyScope;
+    const champ = $('history-champion');
+    const body = $('history-body');
+    const cycles = historyIndex[scope];
+    const meta = cycles.find((c) => c.id === id) || cycles[0];
+    $('history-period').textContent = meta ? periodLabel(meta.start, meta.end) : '—';
+    body.innerHTML = `<tr class="lb__empty"><td colspan="4">Loading…</td></tr>`;
+    try {
+      const res = await fetch(`${VIEWS[scope].historyDir}/${encodeURIComponent(id)}.json`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const past = await res.json();
+      if (historyScope !== scope) return;   // switched competition mid-flight
+      const winners = past.entries.filter((e) => e.prize > 0);
+
+      $('history-period').textContent = periodLabel(past.periodStart, past.periodEnd);
+
+      if (!winners.length) {
+        champ.innerHTML = '';
+        body.innerHTML = `<tr class="lb__empty"><td colspan="4">No winners recorded for this period.</td></tr>`;
+        return;
+      }
+
+      const [first] = winners;
+      champ.innerHTML = `
+        <div class="champion">
+          <span class="champion__crown">👑</span>
+          <span class="champion__body">
+            <span class="champion__tag">${scope === 'weekly' ? 'Weekly champion' : 'Monthly champion'} · ${escapeHtml(periodLabel(past.periodStart, past.periodEnd))}</span>
+            <span class="champion__name">${escapeHtml(first.masked)}</span>
+            <span class="champion__meta">${moneyExact.format(first.wagered)} wagered</span>
+          </span>
+          <span class="champion__prize">${money.format(first.prize)}</span>
+        </div>`;
+
+      body.innerHTML = winners.map((e) => `
+        <tr class="is-top">
+          <td><span class="lb__rank">${e.rank}</span></td>
+          <td class="lb__name">${escapeHtml(e.masked)}</td>
+          <td class="num">${moneyExact.format(e.wagered)}</td>
+          <td class="num lb__prize">${money.format(e.prize)}</td>
+        </tr>`).join('');
+    } catch {
+      if (historyScope !== scope) return;
+      champ.innerHTML = '';
+      body.innerHTML = `<tr class="lb__empty"><td colspan="4">Could not load this period.</td></tr>`;
+    }
+  }
+
+  function renderHistory() {
+    const cycles = historyIndex[historyScope];
     const select = $('history-select');
     select.innerHTML = cycles
       .map((c) => `<option value="${c.id}">${periodLabel(c.start, c.end)}</option>`).join('');
-    // A single closed cycle leaves nothing to choose between.
+    // A single closed period leaves nothing to choose between.
     select.hidden = cycles.length < 2;
-    $('history').hidden = false;
-
-    async function showCycle(id) {
-      const champ = $('history-champion');
-      const body = $('history-body');
-      body.innerHTML = `<tr class="lb__empty"><td colspan="4">Loading…</td></tr>`;
-      try {
-        const res = await fetch(`${VIEWS[active].historyDir}/${encodeURIComponent(id)}.json`, { cache: 'no-store' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const past = await res.json();
-        const winners = past.entries.filter((e) => e.prize > 0);
-
-        if (!winners.length) {
-          champ.innerHTML = '';
-          body.innerHTML = `<tr class="lb__empty"><td colspan="4">No winners recorded for this cycle.</td></tr>`;
-          return;
-        }
-
-        const [first] = winners;
-        champ.innerHTML = `
-          <div class="champion">
-            <span class="champion__crown">👑</span>
-            <span class="champion__body">
-              <span class="champion__tag">Champion · ${escapeHtml(periodLabel(past.periodStart, past.periodEnd))}</span>
-              <span class="champion__name">${escapeHtml(first.masked)}</span>
-              <span class="champion__meta">${moneyExact.format(first.wagered)} wagered</span>
-            </span>
-            <span class="champion__prize">${money.format(first.prize)}</span>
-          </div>`;
-
-        body.innerHTML = winners.map((e) => `
-          <tr class="is-top">
-            <td><span class="lb__rank">${e.rank}</span></td>
-            <td class="lb__name">${escapeHtml(e.masked)}</td>
-            <td class="num">${moneyExact.format(e.wagered)}</td>
-            <td class="num lb__prize">${money.format(e.prize)}</td>
-          </tr>`).join('');
-      } catch {
-        champ.innerHTML = '';
-        body.innerHTML = `<tr class="lb__empty"><td colspan="4">Could not load this cycle.</td></tr>`;
-      }
+    if (!cycles.length) {
+      $('history-champion').innerHTML = '';
+      $('history-period').textContent = '—';
+      $('history-body').innerHTML = `<tr class="lb__empty"><td colspan="4">
+        No ${historyScope === 'weekly' ? 'week' : 'month'} has closed yet.</td></tr>`;
+      return;
     }
-
-    select.onchange = () => showCycle(select.value);
-    showCycle(cycles[0].id);
+    showPeriod(cycles[0].id);
   }
 
-  /* ---------- Weekly / monthly tabs ------------------------------------ */
+  function setScope(next) {
+    if (next === historyScope) return;
+    historyScope = next;
+    for (const name of ['monthly', 'weekly']) {
+      const chip = $(`scope-${name}`);
+      const on = name === historyScope;
+      chip.classList.toggle('is-active', on);
+      chip.setAttribute('aria-selected', String(on));
+    }
+    renderHistory();
+  }
 
-  /* The markup ships on every site. Without a funded weekly board there is
-     nothing on the other tab, so the switcher stays hidden and the weekly
-     files are never requested. */
+  /* ---------- Tabs ------------------------------------------------------ */
+
+  const LIVE = ['countdown-wrap', 'stats', 'live-board'];
+
   function setView(next) {
-    if (next === view || !VIEWS[next]) return;
+    if (next === view) return;
     view = next;
-    showingAll = false;
-    board = null;
-    for (const name of Object.keys(VIEWS)) {
+    for (const name of ['monthly', 'weekly', 'history']) {
       const tab = $(`tab-${name}`);
       if (!tab) continue;
       const on = name === view;
       tab.classList.toggle('is-active', on);
       tab.setAttribute('aria-selected', String(on));
     }
-    resetTs = VIEWS[view].nextReset(zonedToday());
+
+    const past = view === 'history';
+    for (const id of LIVE) $(id).hidden = past;
+    $('history').hidden = !past;
+    $('board-title').textContent = past ? 'Past winners' : 'Current leaderboard';
+    $('board-sub').textContent = past
+      ? 'Final standings from every period that has closed, straight from Rainbet.'
+      : 'Usernames are partially hidden to protect player privacy. Search below to find your own position.';
+
+    if (past) { renderHistory(); return; }
+
+    // Back to a live board.
+    boardView = view;
+    showingAll = false;
+    board = null;
+    resetTs = VIEWS[boardView].nextReset(zonedToday());
     setResult('Enter your Rainbet username to find your position.', null);
     $('lb-body').innerHTML = `<tr class="lb__empty"><td colspan="4">Loading leaderboard…</td></tr>`;
     loadBoard();
-    loadHistory();
   }
 
-  if (WEEKLY_ENABLED) {
-    $('board-tabs').hidden = false;
-    for (const name of Object.keys(VIEWS)) {
+  async function wireTabs() {
+    historyIndex.monthly = await loadIndex('monthly');
+    if (WEEKLY_ENABLED) historyIndex.weekly = await loadIndex('weekly');
+
+    const hasHistory = historyIndex.monthly.length > 0 || historyIndex.weekly.length > 0;
+    if (WEEKLY_ENABLED || hasHistory) $('board-tabs').hidden = false;
+    if (WEEKLY_ENABLED) $('tab-weekly').hidden = false;
+    if (hasHistory) $('tab-history').hidden = false;
+
+    // The competition chips only earn their place when both have closed periods
+    // to show. With one, the tab is unambiguous already.
+    if (historyIndex.monthly.length && historyIndex.weekly.length) {
+      $('history-scope').hidden = false;
+    } else if (historyIndex.weekly.length) {
+      historyScope = 'weekly';
+    }
+
+    for (const name of ['monthly', 'weekly', 'history']) {
       $(`tab-${name}`).addEventListener('click', () => setView(name));
     }
+    $('scope-monthly').addEventListener('click', () => setScope('monthly'));
+    $('scope-weekly').addEventListener('click', () => setScope('weekly'));
+    $('history-select').addEventListener('change', () => showPeriod($('history-select').value));
   }
 
   loadBoard();
-  loadHistory();
+  wireTabs();
 })();

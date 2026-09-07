@@ -108,6 +108,7 @@ h1, h2, h3, .unit__num, .stat__num, .brand, code {
 }
 
 a { color: var(--accent-lit); }
+[hidden] { display: none !important; }
 
 .visually-hidden {
   position: absolute; width: 1px; height: 1px;
@@ -395,6 +396,45 @@ section { scroll-margin-top: 90px; }
 }
 .board-tab:focus-visible { outline: 2px solid var(--accent-lit); outline-offset: 2px; }
 
+/* Monthly / weekly chips inside Past winners. Quieter than the board tabs —
+   they pick a competition within a view, not a view. */
+.history__scope {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1.4rem;
+}
+.scope-tab {
+  min-height: 44px;
+  padding: 0 1.3rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.82rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
+}
+.scope-tab:hover { color: var(--text); }
+.scope-tab.is-active {
+  background: var(--accent-a10);
+  border-color: var(--accent);
+  color: var(--accent-lit);
+}
+.scope-tab:focus-visible { outline: 2px solid var(--accent-lit); outline-offset: 2px; }
+
+.history__period {
+  margin: 0 0 1.2rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+.history__period strong { color: var(--text); }
+
 /* ---------- Podium ---------- */
 .podium {
   display: grid;
@@ -674,7 +714,7 @@ tr.is-you .lb__name::after {
 .social--website:hover   { border-color: var(--accent); box-shadow: 0 0 30px var(--accent-a22); }
 
 /* ---------- Previous winners ---------- */
-.history { margin-top: 5rem; }
+.history { margin-top: 0; }
 .history__controls { text-align: center; margin-bottom: 1.5rem; }
 .history__controls select[hidden] { display: none; }
 .history__controls select {
