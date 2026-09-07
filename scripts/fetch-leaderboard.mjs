@@ -158,7 +158,7 @@ function searchHash(name) {
   return createHash('sha256').update(name.trim().toLowerCase()).digest('hex').slice(0, 16);
 }
 
-function buildBoard(payload, cycle, prizes = PRIZES, boardSize = BOARD_SIZE) {
+function buildBoard(payload, cycle, prizes = PRIZES, boardSize = BOARD_SIZE, mode = CYCLE_MODE) {
   const rows = payload.affiliates
     .map((a) => ({ username: String(a.username ?? ''), wagered: Number(a.wagered_amount) }))
     .filter((a) => a.username && Number.isFinite(a.wagered) && a.wagered > 0)
@@ -176,8 +176,9 @@ function buildBoard(payload, cycle, prizes = PRIZES, boardSize = BOARD_SIZE) {
     cycle: cycle.id,
     periodStart: cycle.start,
     periodEnd: cycle.end,
-    cycleMode: CYCLE_MODE,
-    cycleStartDay: CYCLE_START_DAY,
+    cycleMode: mode,
+    // A weekly cycle always opens on a Monday, so the offset day means nothing.
+    cycleStartDay: mode === 'weekly' ? 1 : CYCLE_START_DAY,
     timezone: TZ,
     prizePool: prizes.reduce((a, b) => a + b, 0),
     prizes,
@@ -229,8 +230,8 @@ const today = todayInTz();
  * just closed (once, since a closed period's totals are final), and rebuilds
  * the index of closed periods from what is actually on disk.
  */
-async function refresh({ label, dir, file, cycle, previous, prizes, boardSize, firstCycle, periodOf }) {
-  const board = buildBoard(await fetchCycle(cycle), cycle, prizes, boardSize);
+async function refresh({ label, dir, file, cycle, previous, prizes, boardSize, firstCycle, periodOf, mode }) {
+  const board = buildBoard(await fetchCycle(cycle), cycle, prizes, boardSize, mode);
   await writeJson(join(ROOT, 'data', file), board);
   console.log(`${label} ${cycle.start}..${cycle.end}: ${board.playerCount} players, $${board.totalWagered} wagered`);
 
@@ -241,7 +242,7 @@ async function refresh({ label, dir, file, cycle, previous, prizes, boardSize, f
     console.log(`${label} ${previous.id} already archived`);
   } else {
     try {
-      const previousBoard = buildBoard(await fetchCycle(previous), previous, prizes, boardSize);
+      const previousBoard = buildBoard(await fetchCycle(previous), previous, prizes, boardSize, mode);
       if (previousBoard.playerCount > 0) {
         await writeJson(archivePath, previousBoard);
       } else {
@@ -268,6 +269,7 @@ async function refresh({ label, dir, file, cycle, previous, prizes, boardSize, f
 
 await refresh({
   label: 'monthly:',
+  mode: CYCLE_MODE,
   dir: 'history',
   file: 'leaderboard.json',
   cycle: cycleContaining(today),
@@ -288,6 +290,7 @@ if (WEEKLY_ENABLED) {
   const week = weekContaining(today);
   await refresh({
     label: 'weekly:',
+    mode: 'weekly',
     dir: 'history-weekly',
     file: 'weekly.json',
     cycle: week,
