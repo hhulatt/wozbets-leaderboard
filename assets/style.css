@@ -357,6 +357,44 @@ h1 {
 .section-sub { margin: 0 auto; max-width: 560px; color: var(--muted); font-size: 0.95rem; }
 section { scroll-margin-top: 90px; }
 
+/* ---------- Weekly / monthly tabs ---------- */
+/* Hidden unless the creator funds a weekly board. Sized as a real tap target
+   so the two boards are equally reachable on a phone. */
+.board-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 0.4rem;
+  margin: 0 auto 2rem;
+  padding: 0.35rem;
+  width: fit-content;
+  max-width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+.board-tab {
+  min-height: 44px;
+  padding: 0 1.6rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.board-tab:hover { color: var(--text); }
+.board-tab.is-active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  color: var(--on-accent);
+  box-shadow: 0 6px 20px var(--accent-a40);
+}
+.board-tab:focus-visible { outline: 2px solid var(--accent-lit); outline-offset: 2px; }
+
 /* ---------- Podium ---------- */
 .podium {
   display: grid;

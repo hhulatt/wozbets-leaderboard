@@ -68,16 +68,21 @@
   </section>
 
   <section class="stats" aria-label="Competition stats">
-    <div class="stat"><span class="stat__num">$250</span><span class="stat__label">Prize pool</span></div>
-    <div class="stat"><span class="stat__num">5</span><span class="stat__label">Paid places</span></div>
+    <div class="stat"><span class="stat__num" id="stat-pool">$250</span><span class="stat__label">Prize pool</span></div>
+    <div class="stat"><span class="stat__num" id="stat-places">5</span><span class="stat__label">Paid places</span></div>
     <div class="stat"><span class="stat__num" id="stat-players">—</span><span class="stat__label">Players competing</span></div>
-    <div class="stat"><span class="stat__num" id="stat-wagered">—</span><span class="stat__label">Wagered this cycle</span></div>
+    <div class="stat"><span class="stat__num" id="stat-wagered">—</span><span class="stat__label" id="stat-wagered-label">Wagered this cycle</span></div>
   </section>
 
   <section id="leaderboard" class="board">
     <div class="section-head">
       <h2>Current leaderboard</h2>
       <p class="section-sub">Usernames are partially hidden to protect player privacy. Search below to find your own position.</p>
+    </div>
+
+    <div class="board-tabs" id="board-tabs" role="tablist" aria-label="Choose a leaderboard" hidden>
+      <button class="board-tab is-active" id="tab-monthly" type="button" role="tab" aria-selected="true">Monthly</button>
+      <button class="board-tab" id="tab-weekly" type="button" role="tab" aria-selected="false">Weekly</button>
     </div>
 
     <div class="podium" id="podium" aria-label="Top three wagerers"></div>
@@ -127,7 +132,7 @@
   <section id="prizes" class="prizes">
     <div class="section-head">
       <h2>Prize breakdown</h2>
-      <p class="section-sub">$250 shared across the top 5 wagerers, paid at the end of every cycle.</p>
+      <p class="section-sub" id="prizes-sub">$250 shared across the top 5 wagerers, paid at the end of every cycle.</p>
     </div>
     <ol class="prize-grid" id="prize-grid"></ol>
   </section>

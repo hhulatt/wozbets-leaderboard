@@ -40,6 +40,14 @@ const BOARD_SIZE = 25;
  */
 const FIRST_CYCLE = '2026-09-01';
 
+/* A weekly board runs alongside the monthly one when the creator funds one.
+   It has its own pool, its own archive and its own first cycle; everything
+   else — masking, ranking, the board shape — is shared. */
+const WEEKLY_ENABLED = false;
+const WEEKLY_PRIZES = [];
+const WEEKLY_BOARD_SIZE = 25;
+const WEEKLY_FIRST_CYCLE = '';
+
 /** Today's date in the leaderboard timezone, as { year, month, day }. */
 function todayInTz() {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -108,6 +116,32 @@ function cycleBefore(cycle) {
   return cycleStartingIn(prev.year, prev.month);
 }
 
+/* Weeks run Monday to Sunday. The arithmetic is whole UTC days, which is exact
+   under DST; only the site's countdown converts back to a zoned midnight. */
+
+const DAY_MS = 86400000;
+
+function isoFromTs(ts) {
+  const d = new Date(ts);
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+}
+
+/** The Monday-to-Sunday week containing the given date. */
+function weekContaining({ year, month, day }) {
+  const ts = Date.UTC(year, month - 1, day);
+  // getUTCDay is 0 for Sunday, so shift it to "days since Monday".
+  const sinceMonday = (new Date(ts).getUTCDay() + 6) % 7;
+  const start = ts - sinceMonday * DAY_MS;
+  return { id: isoFromTs(start), start: isoFromTs(start), end: isoFromTs(start + 6 * DAY_MS) };
+}
+
+/** The week that closed immediately before the given one. */
+function weekBefore(week) {
+  const [y, m, d] = week.start.split('-').map(Number);
+  const start = Date.UTC(y, m - 1, d) - 7 * DAY_MS;
+  return { id: isoFromTs(start), start: isoFromTs(start), end: isoFromTs(start + 6 * DAY_MS) };
+}
+
 /**
  * Masks the middle of a username so players can still recognise their own row
  * without the board publishing anyone's full handle.
@@ -124,7 +158,7 @@ function searchHash(name) {
   return createHash('sha256').update(name.trim().toLowerCase()).digest('hex').slice(0, 16);
 }
 
-function buildBoard(payload, cycle) {
+function buildBoard(payload, cycle, prizes = PRIZES, boardSize = BOARD_SIZE) {
   const rows = payload.affiliates
     .map((a) => ({ username: String(a.username ?? ''), wagered: Number(a.wagered_amount) }))
     .filter((a) => a.username && Number.isFinite(a.wagered) && a.wagered > 0)
@@ -135,7 +169,7 @@ function buildBoard(payload, cycle) {
     masked: maskUsername(row.username),
     hash: searchHash(row.username),
     wagered: Number(row.wagered.toFixed(2)),
-    prize: PRIZES[i] ?? 0,
+    prize: prizes[i] ?? 0,
   }));
 
   return {
@@ -145,9 +179,9 @@ function buildBoard(payload, cycle) {
     cycleMode: CYCLE_MODE,
     cycleStartDay: CYCLE_START_DAY,
     timezone: TZ,
-    prizePool: PRIZES.reduce((a, b) => a + b, 0),
-    prizes: PRIZES,
-    boardSize: BOARD_SIZE,
+    prizePool: prizes.reduce((a, b) => a + b, 0),
+    prizes,
+    boardSize,
     totalWagered: Number(rows.reduce((sum, r) => sum + r.wagered, 0).toFixed(2)),
     playerCount: rows.length,
     cacheUpdatedAt: payload.cache_updated_at ?? null,
@@ -188,46 +222,82 @@ async function writeJson(path, data) {
   console.log(`wrote ${path}`);
 }
 
-const current = cycleContaining(todayInTz());
-const board = buildBoard(await fetchCycle(current), current);
-await writeJson(join(ROOT, 'data', 'leaderboard.json'), board);
-console.log(`${current.start}..${current.end}: ${board.playerCount} players, $${board.totalWagered} wagered`);
+const today = todayInTz();
 
-// Archive the cycle that just closed so the site can show its winners. Once a
-// cycle is over its totals are final, so an existing archive is never refetched.
-const previous = cycleBefore(current);
-const archivePath = join(ROOT, 'data', 'history', `${previous.id}.json`);
-if (FIRST_CYCLE && previous.id < FIRST_CYCLE) {
-  console.log(`${previous.id} is before the first cycle (${FIRST_CYCLE}) — not archiving`);
-} else if (await exists(archivePath)) {
-  console.log(`${previous.id} already archived`);
-} else {
-  try {
-    const previousBoard = buildBoard(await fetchCycle(previous), previous);
-    if (previousBoard.playerCount > 0) {
-      await writeJson(archivePath, previousBoard);
-    } else {
-      console.log(`${previous.start}..${previous.end} has no wagers, nothing to archive`);
+/**
+ * Refreshes one board: writes the current snapshot, archives the period that
+ * just closed (once, since a closed period's totals are final), and rebuilds
+ * the index of closed periods from what is actually on disk.
+ */
+async function refresh({ label, dir, file, cycle, previous, prizes, boardSize, firstCycle, periodOf }) {
+  const board = buildBoard(await fetchCycle(cycle), cycle, prizes, boardSize);
+  await writeJson(join(ROOT, 'data', file), board);
+  console.log(`${label} ${cycle.start}..${cycle.end}: ${board.playerCount} players, $${board.totalWagered} wagered`);
+
+  const archivePath = join(ROOT, 'data', dir, `${previous.id}.json`);
+  if (firstCycle && previous.id < firstCycle) {
+    console.log(`${label} ${previous.id} is before the first cycle (${firstCycle}) — not archiving`);
+  } else if (await exists(archivePath)) {
+    console.log(`${label} ${previous.id} already archived`);
+  } else {
+    try {
+      const previousBoard = buildBoard(await fetchCycle(previous), previous, prizes, boardSize);
+      if (previousBoard.playerCount > 0) {
+        await writeJson(archivePath, previousBoard);
+      } else {
+        console.log(`${label} ${previous.start}..${previous.end} has no wagers, nothing to archive`);
+      }
+    } catch (err) {
+      console.warn(`${label} could not archive ${previous.id}: ${err.message}`);
     }
-  } catch (err) {
-    console.warn(`could not archive ${previous.id}: ${err.message}`);
   }
+
+  // Rebuilt from disk each run so adding or removing an archive by hand stays
+  // consistent. A brand-new site whose first archive attempt found no wagers
+  // has no directory yet, and readdir would throw before the index is written.
+  const historyDir = join(ROOT, 'data', dir);
+  await mkdir(historyDir, { recursive: true });
+  const cycles = (await readdir(historyDir))
+    .filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f))
+    .map((f) => f.replace('.json', ''))
+    .sort()
+    .reverse()
+    .map(periodOf);
+  await writeJson(join(historyDir, 'index.json'), { cycles });
 }
 
-// Index of closed cycles, newest first, so the site can list past winners.
-// Rebuilt from disk each run so adding or removing an archive by hand stays consistent.
-const historyDir = join(ROOT, 'data', 'history');
-// A brand-new site whose first archive attempt found no wagers has no history
-// directory yet, and readdir would throw before the index could be written.
-await mkdir(historyDir, { recursive: true });
-const cycles = (await readdir(historyDir))
-  .filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f))
-  .map((f) => f.replace('.json', ''))
-  .sort()
-  .reverse()
-  .map((id) => {
+await refresh({
+  label: 'monthly:',
+  dir: 'history',
+  file: 'leaderboard.json',
+  cycle: cycleContaining(today),
+  previous: cycleBefore(cycleContaining(today)),
+  prizes: PRIZES,
+  boardSize: BOARD_SIZE,
+  firstCycle: FIRST_CYCLE,
+  periodOf: (id) => {
     const [y, m] = id.split('-').map(Number);
     const { start, end } = cycleStartingIn(y, m);
     return { id, start, end };
+  },
+});
+
+// The weekly board is a separate competition with its own money behind it.
+// Nothing is fetched or written for it unless the creator has funded one.
+if (WEEKLY_ENABLED) {
+  const week = weekContaining(today);
+  await refresh({
+    label: 'weekly:',
+    dir: 'history-weekly',
+    file: 'weekly.json',
+    cycle: week,
+    previous: weekBefore(week),
+    prizes: WEEKLY_PRIZES,
+    boardSize: WEEKLY_BOARD_SIZE,
+    firstCycle: WEEKLY_FIRST_CYCLE,
+    periodOf: (id) => {
+      const [y, m, d] = id.split('-').map(Number);
+      return weekContaining({ year: y, month: m, day: d });
+    },
   });
-await writeJson(join(historyDir, 'index.json'), { cycles });
+}

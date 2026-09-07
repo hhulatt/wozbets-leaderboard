@@ -18,6 +18,11 @@
   const CYCLE_START_DAY = 1;
   const DATA_URL = 'data/leaderboard.json';
   const HISTORY_INDEX_URL = 'data/history/index.json';
+  /* A weekly board runs alongside the monthly one, funded separately by the
+     creator. The code ships to every site; only this flag turns it on. */
+  const WEEKLY_ENABLED = false;
+  const WEEK_DATA_URL = 'data/weekly.json';
+  const WEEK_HISTORY_INDEX_URL = 'data/history-weekly/index.json';
 
   const $ = (id) => document.getElementById(id);
 
@@ -80,6 +85,40 @@
     return zonedMidnight(n.year, n.month, CYCLE_START_DAY);
   }
 
+  /* ---------- Weekly cycle model ---------------------------------------
+     Weeks run Monday 00:00 to Sunday 23:59 in the leaderboard's timezone.
+     The arithmetic is done on whole UTC days, which is exact regardless of
+     DST; only the countdown target is converted back to a zoned midnight. */
+
+  const DAY_MS = 86400000;
+  const isoFromTs = (ts) => {
+    const d = new Date(ts);
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+  };
+
+  /** The Monday-to-Sunday week containing the given date. */
+  function weekContaining({ year, month, day }) {
+    const ts = Date.UTC(year, month - 1, day);
+    // getUTCDay is 0 for Sunday, so shift it to "days since Monday".
+    const sinceMonday = (new Date(ts).getUTCDay() + 6) % 7;
+    const start = ts - sinceMonday * DAY_MS;
+    return { id: isoFromTs(start), start: isoFromTs(start), end: isoFromTs(start + 6 * DAY_MS) };
+  }
+
+  /** The week that closed immediately before the given one. */
+  function weekBefore(week) {
+    const [y, m, d] = week.start.split('-').map(Number);
+    const start = Date.UTC(y, m - 1, d) - 7 * DAY_MS;
+    return { id: isoFromTs(start), start: isoFromTs(start), end: isoFromTs(start + 6 * DAY_MS) };
+  }
+
+  /** Midnight opening the week after the one containing `today`. */
+  function nextWeeklyResetTs(today) {
+    const [y, m, d] = weekContaining(today).end.split('-').map(Number);
+    const next = new Date(Date.UTC(y, m - 1, d) + DAY_MS);
+    return zonedMidnight(next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate());
+  }
+
   /** "1 - 30 Sep 2026", dropping the year on the start when both match. */
   function periodLabel(startISO, endISO) {
     const start = new Date(`${startISO}T00:00:00Z`);
@@ -99,15 +138,42 @@
 
   /* ---------- Countdown ------------------------------------------------ */
 
+  /* ---------- Views ----------------------------------------------------
+     The monthly board is the headline and always the one that loads first.
+     A weekly board, when the creator funds one, is a second dataset with the
+     same shape — so switching view is a matter of swapping which files are
+     read, not of rendering anything differently. */
+
+  const VIEWS = {
+    monthly: {
+      dataUrl: DATA_URL,
+      historyIndexUrl: HISTORY_INDEX_URL,
+      historyDir: 'data/history',
+      nextReset: nextResetTs,
+      periodWord: 'cycle',
+    },
+    weekly: {
+      dataUrl: WEEK_DATA_URL,
+      historyIndexUrl: WEEK_HISTORY_INDEX_URL,
+      historyDir: 'data/history-weekly',
+      nextReset: nextWeeklyResetTs,
+      periodWord: 'week',
+    },
+  };
+
+  let view = 'monthly';
+  const cache = {};
+
   const cd = { d: $('cd-days'), h: $('cd-hours'), m: $('cd-mins'), s: $('cd-secs') };
-  let resetTs = nextResetTs(zonedToday());
+  let resetTs = VIEWS[view].nextReset(zonedToday());
 
   function tickCountdown() {
     let remaining = resetTs - Date.now();
     if (remaining <= 0) {
       // Cycle just rolled over: re-target and pull the fresh board.
-      resetTs = nextResetTs(zonedToday());
+      resetTs = VIEWS[view].nextReset(zonedToday());
       remaining = Math.max(0, resetTs - Date.now());
+      delete cache[view];
       loadBoard();
     }
     const total = Math.floor(remaining / 1000);
@@ -184,11 +250,24 @@
     }).join('');
   }
 
+  function placesPhrase(n) {
+    return n === 1 ? 'single top wagerer' : `top ${n} wagerers`;
+  }
+
   function renderBoard(data) {
     board = data;
+    const word = VIEWS[view].periodWord;
+    const places = data.prizes.length;
     $('period-label').textContent = periodLabel(data.periodStart, data.periodEnd);
     $('stat-players').textContent = data.playerCount.toLocaleString('en-GB');
     $('stat-wagered').textContent = money.format(data.totalWagered);
+    // Pool and paid places come from the board itself, so the headline figures
+    // can never drift from the prizes the data actually pays out.
+    $('stat-pool').textContent = money.format(data.prizePool);
+    $('stat-places').textContent = String(places);
+    $('stat-wagered-label').textContent = `Wagered this ${word}`;
+    $('prizes-sub').textContent =
+      `${money.format(data.prizePool)} shared across the ${placesPhrase(places)}, paid at the end of every ${word}.`;
     $('updated-at').textContent = new Date(data.updatedAt)
       .toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: TZ }) + ' UK';
     renderPodium(data.entries);
@@ -208,12 +287,18 @@
   }
 
   async function loadBoard() {
+    const active = view;
+    if (cache[active]) { renderBoard(cache[active]); return; }
     try {
-      const res = await fetch(`${DATA_URL}?v=${Date.now()}`, { cache: 'no-store' });
+      const res = await fetch(`${VIEWS[active].dataUrl}?v=${Date.now()}`, { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      renderBoard(await res.json());
+      const data = await res.json();
+      cache[active] = data;
+      // The viewer may have switched tabs while this was in flight.
+      if (view === active) renderBoard(data);
     } catch (err) {
       console.error('Could not load leaderboard', err);
+      if (view !== active) return;
       $('lb-body').innerHTML = `<tr class="lb__empty"><td colspan="4">
         Leaderboard is temporarily unavailable. Please refresh in a moment.</td></tr>`;
     }
@@ -297,13 +382,17 @@
   /* Populated from the archived snapshot of each closed cycle. Until the first
      cycle ends the section stays hidden rather than showing an empty table. */
   async function loadHistory() {
+    const active = view;
+    // Hidden until this view proves it has something to show — a site can have
+    // closed months and no closed weeks, or the other way round.
+    $('history').hidden = true;
     let cycles = [];
     try {
-      const res = await fetch(`${HISTORY_INDEX_URL}?v=${Date.now()}`, { cache: 'no-store' });
+      const res = await fetch(`${VIEWS[active].historyIndexUrl}?v=${Date.now()}`, { cache: 'no-store' });
       if (!res.ok) return;
       cycles = (await res.json()).cycles || [];
     } catch { return; }
-    if (!cycles.length) return;
+    if (!cycles.length || view !== active) return;
 
     const select = $('history-select');
     select.innerHTML = cycles
@@ -317,7 +406,7 @@
       const body = $('history-body');
       body.innerHTML = `<tr class="lb__empty"><td colspan="4">Loading…</td></tr>`;
       try {
-        const res = await fetch(`data/history/${encodeURIComponent(id)}.json`, { cache: 'no-store' });
+        const res = await fetch(`${VIEWS[active].historyDir}/${encodeURIComponent(id)}.json`, { cache: 'no-store' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const past = await res.json();
         const winners = past.entries.filter((e) => e.prize > 0);
@@ -353,8 +442,39 @@
       }
     }
 
-    select.addEventListener('change', () => showCycle(select.value));
+    select.onchange = () => showCycle(select.value);
     showCycle(cycles[0].id);
+  }
+
+  /* ---------- Weekly / monthly tabs ------------------------------------ */
+
+  /* The markup ships on every site. Without a funded weekly board there is
+     nothing on the other tab, so the switcher stays hidden and the weekly
+     files are never requested. */
+  function setView(next) {
+    if (next === view || !VIEWS[next]) return;
+    view = next;
+    showingAll = false;
+    board = null;
+    for (const name of Object.keys(VIEWS)) {
+      const tab = $(`tab-${name}`);
+      if (!tab) continue;
+      const on = name === view;
+      tab.classList.toggle('is-active', on);
+      tab.setAttribute('aria-selected', String(on));
+    }
+    resetTs = VIEWS[view].nextReset(zonedToday());
+    setResult('Enter your Rainbet username to find your position.', null);
+    $('lb-body').innerHTML = `<tr class="lb__empty"><td colspan="4">Loading leaderboard…</td></tr>`;
+    loadBoard();
+    loadHistory();
+  }
+
+  if (WEEKLY_ENABLED) {
+    $('board-tabs').hidden = false;
+    for (const name of Object.keys(VIEWS)) {
+      $(`tab-${name}`).addEventListener('click', () => setView(name));
+    }
   }
 
   loadBoard();
