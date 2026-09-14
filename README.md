@@ -42,6 +42,7 @@ The board therefore keeps working if the API is down, and costs nothing to serve
 | Timezone | Europe/London |
 | Refresh | 2 0 * * * and 2 23 * * * (UTC) |
 | Weekly board | off — set "weekly" in the creator config to switch it on |
+| Username masking | OFF — full usernames are published |
 
 ## Go-live checklist
 

@@ -143,10 +143,16 @@ function weekBefore(week) {
 }
 
 /**
- * Masks the middle of a username so players can still recognise their own row
- * without the board publishing anyone's full handle.
+ * Whether to publish full usernames. When false the middle of each handle is
+ * starred out, so a player can recognise their own row without the board
+ * publishing anyone's full handle. When true the board shows handles in full,
+ * which is what most casino leaderboards do - and which cannot be undone for
+ * anyone who has already been published.
  */
+const SHOW_FULL_USERNAMES = true;
+
 function maskUsername(name) {
+  if (SHOW_FULL_USERNAMES) return name;
   const chars = [...name];
   if (chars.length <= 2) return `${chars[0] ?? '*'}**`;
   if (chars.length <= 5) return `${chars[0]}${'*'.repeat(chars.length - 2)}${chars.at(-1)}`;
