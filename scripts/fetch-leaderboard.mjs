@@ -14,7 +14,7 @@
  * makes the countdown disagree with the data.
  */
 import { createHash } from 'node:crypto';
-import { mkdir, writeFile, access, readdir } from 'node:fs/promises';
+import { mkdir, writeFile, access, readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -186,6 +186,7 @@ function buildBoard(payload, cycle, prizes = PRIZES, boardSize = BOARD_SIZE, mod
     // A weekly cycle always opens on a Monday, so the offset day means nothing.
     cycleStartDay: mode === 'weekly' ? 1 : CYCLE_START_DAY,
     timezone: TZ,
+    fullUsernames: SHOW_FULL_USERNAMES,
     prizePool: prizes.reduce((a, b) => a + b, 0),
     prizes,
     boardSize,
@@ -195,6 +196,22 @@ function buildBoard(payload, cycle, prizes = PRIZES, boardSize = BOARD_SIZE, mod
     updatedAt: new Date().toISOString(),
     entries,
   };
+}
+
+/**
+ * Was this stored board written under a different masking setting than the one
+ * in force now? A closed period's totals are final and are never refetched -
+ * but if masking has been switched since, the archive is showing names in a
+ * form the site no longer uses, and it would stay that way forever.
+ *
+ * Archives written before this flag existed carry no `fullUsernames`, so fall
+ * back to the shape of the names: masking always inserts at least one "*".
+ */
+function maskingChanged(stored) {
+  const wasFull = typeof stored?.fullUsernames === 'boolean'
+    ? stored.fullUsernames
+    : !(stored?.entries ?? []).every((e) => String(e.masked).includes('*'));
+  return wasFull !== SHOW_FULL_USERNAMES;
 }
 
 /* --8<-- end of extracted region --8<-- */
@@ -242,11 +259,18 @@ async function refresh({ label, dir, file, cycle, previous, prizes, boardSize, f
   console.log(`${label} ${cycle.start}..${cycle.end}: ${board.playerCount} players, $${board.totalWagered} wagered`);
 
   const archivePath = join(ROOT, 'data', dir, `${previous.id}.json`);
+  let stale = false;
+  if (await exists(archivePath)) {
+    try {
+      stale = maskingChanged(JSON.parse(await readFile(archivePath, 'utf8')));
+    } catch { stale = false; }
+  }
   if (firstCycle && previous.id < firstCycle) {
     console.log(`${label} ${previous.id} is before the first cycle (${firstCycle}) — not archiving`);
-  } else if (await exists(archivePath)) {
+  } else if ((await exists(archivePath)) && !stale) {
     console.log(`${label} ${previous.id} already archived`);
   } else {
+    if (stale) console.log(`${label} ${previous.id} was archived under the old username setting — rewriting it`);
     try {
       const previousBoard = buildBoard(await fetchCycle(previous), previous, prizes, boardSize, mode);
       if (previousBoard.playerCount > 0) {
