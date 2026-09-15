@@ -5,6 +5,7 @@
   "cycleMode": "monthly",
   "cycleStartDay": 1,
   "timezone": "Europe/London",
+  "fullUsernames": true,
   "prizePool": 250,
   "prizes": [
     100,
@@ -14,77 +15,77 @@
     20
   ],
   "boardSize": 25,
-  "totalWagered": 5043.13,
+  "totalWagered": 5309,
   "playerCount": 10,
-  "cacheUpdatedAt": "2026-09-14 04:28:56",
-  "updatedAt": "2026-09-14T04:28:57.044Z",
+  "cacheUpdatedAt": "2026-09-15 01:21:15",
+  "updatedAt": "2026-09-15T01:21:15.331Z",
   "entries": [
     {
       "rank": 1,
-      "masked": "tr****01",
+      "masked": "trip 101",
       "hash": "80bd58bf4abf215d",
-      "wagered": 2936.57,
+      "wagered": 2993.76,
       "prize": 100
     },
     {
       "rank": 2,
-      "masked": "Lu********gi",
+      "masked": "Lukasmelragi",
       "hash": "eabceac2d4d5f653",
-      "wagered": 1096.81,
+      "wagered": 1097.61,
       "prize": 60
     },
     {
       "rank": 3,
-      "masked": "2s**********an",
+      "masked": "2s1mpletrxstan",
       "hash": "0334ead642392576",
-      "wagered": 434.32,
+      "wagered": 434.34,
       "prize": 40
     },
     {
       "rank": 4,
-      "masked": "sa**********oz",
-      "hash": "91503a274fef0cb4",
-      "wagered": 207.18,
+      "masked": "lemomLUTONTOWN",
+      "hash": "b119ec40e087c059",
+      "wagered": 257.45,
       "prize": 30
     },
     {
       "rank": 5,
-      "masked": "le**********WN",
-      "hash": "b119ec40e087c059",
-      "wagered": 178.01,
+      "masked": "LuukF",
+      "hash": "89878f10bfbb7dd4",
+      "wagered": 232.19,
       "prize": 20
     },
     {
       "rank": 6,
-      "masked": "L***F",
-      "hash": "89878f10bfbb7dd4",
-      "wagered": 105.15,
+      "masked": "saberelijahwoz",
+      "hash": "91503a274fef0cb4",
+      "wagered": 208.47,
       "prize": 0
     },
     {
       "rank": 7,
-      "masked": "Th*********ok",
+      "masked": "Thijspenisgok",
       "hash": "2e601110e5e2654f",
-      "wagered": 44.65,
+      "wagered": 44.74,
       "prize": 0
     },
     {
       "rank": 8,
-      "masked": "LS****51",
+      "masked": "LSmith51",
       "hash": "b61e769c875dbbaa",
       "wagered": 25.99,
       "prize": 0
     },
     {
       "rank": 9,
-      "masked": "Al***oz",
+      "masked": "Albawoz",
       "hash": "b6ae3e30f69d9121",
       "wagered": 11.94,
       "prize": 0
     },
     {
       "rank": 10,
-      "masked": "ro****05",
+      "masked": "rohit105",
       "hash": "cc60a5e8dc3d23e3",
       "wagered": 2.51,
       "prize": 0
