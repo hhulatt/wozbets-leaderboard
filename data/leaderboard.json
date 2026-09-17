@@ -15,37 +15,37 @@
     20
   ],
   "boardSize": 25,
-  "totalWagered": 5534.69,
+  "totalWagered": 5535.1,
   "playerCount": 11,
-  "cacheUpdatedAt": "2026-09-16 04:24:37",
-  "updatedAt": "2026-09-16T04:24:37.712Z",
+  "cacheUpdatedAt": "2026-09-17 01:16:34",
+  "updatedAt": "2026-09-17T01:16:34.039Z",
   "entries": [
     {
       "rank": 1,
       "masked": "trip 101",
       "hash": "80bd58bf4abf215d",
-      "wagered": 3191.62,
+      "wagered": 3191.79,
       "prize": 100
     },
     {
       "rank": 2,
       "masked": "Lukasmelragi",
       "hash": "eabceac2d4d5f653",
-      "wagered": 1098.19,
+      "wagered": 1098.26,
       "prize": 60
     },
     {
       "rank": 3,
       "masked": "2s1mpletrxstan",
       "hash": "0334ead642392576",
-      "wagered": 434.34,
+      "wagered": 434.44,
       "prize": 40
     },
     {
       "rank": 4,
       "masked": "lemomLUTONTOWN",
       "hash": "b119ec40e087c059",
-      "wagered": 262.3,
+      "wagered": 262.33,
       "prize": 30
     },
     {
@@ -59,7 +59,7 @@
       "rank": 6,
       "masked": "saberelijahwoz",
       "hash": "91503a274fef0cb4",
-      "wagered": 208.47,
+      "wagered": 208.5,
       "prize": 0
     },
     {
