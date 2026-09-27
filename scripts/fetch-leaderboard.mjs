@@ -199,6 +199,33 @@ function buildBoard(payload, cycle, prizes = PRIZES, boardSize = BOARD_SIZE, mod
 }
 
 /**
+ * An empty board for a period before the competition opened. Without this, a
+ * creator who signs mid-month gets a live board of wagers people placed before
+ * any competition existed, with prize amounts beside them - which reads as a
+ * real leaderboard that was already running.
+ */
+function preLaunchBoard(cycle, prizes, boardSize, mode) {
+  return {
+    cycle: cycle.id,
+    periodStart: cycle.start,
+    periodEnd: cycle.end,
+    cycleMode: mode,
+    cycleStartDay: mode === 'weekly' ? 1 : CYCLE_START_DAY,
+    timezone: TZ,
+    fullUsernames: SHOW_FULL_USERNAMES,
+    prizePool: prizes.reduce((a, b) => a + b, 0),
+    prizes,
+    boardSize,
+    totalWagered: 0,
+    playerCount: 0,
+    cacheUpdatedAt: null,
+    updatedAt: new Date().toISOString(),
+    entries: [],
+    startsOn: FIRST_CYCLE,
+  };
+}
+
+/**
  * Was this stored board written under a different masking setting than the one
  * in force now? A closed period's totals are final and are never refetched -
  * but if masking has been switched since, the archive is showing names in a
@@ -254,9 +281,16 @@ const today = todayInTz();
  * the index of closed periods from what is actually on disk.
  */
 async function refresh({ label, dir, file, cycle, previous, prizes, boardSize, firstCycle, periodOf, mode }) {
-  const board = buildBoard(await fetchCycle(cycle), cycle, prizes, boardSize, mode);
+  // firstCycle guards the live board as well as the archive. Wagers placed
+  // before the competition opened are not competition entries.
+  const beforeLaunch = firstCycle && cycle.id < firstCycle;
+  const board = beforeLaunch
+    ? preLaunchBoard(cycle, prizes, boardSize, mode)
+    : buildBoard(await fetchCycle(cycle), cycle, prizes, boardSize, mode);
   await writeJson(join(ROOT, 'data', file), board);
-  console.log(`${label} ${cycle.start}..${cycle.end}: ${board.playerCount} players, $${board.totalWagered} wagered`);
+  console.log(beforeLaunch
+    ? `${label} ${cycle.start}..${cycle.end} is before the first cycle (${firstCycle}) — empty board, nothing fetched`
+    : `${label} ${cycle.start}..${cycle.end}: ${board.playerCount} players, $${board.totalWagered} wagered`);
 
   const archivePath = join(ROOT, 'data', dir, `${previous.id}.json`);
   let stale = false;

@@ -207,11 +207,25 @@
       </article>`).join('');
   }
 
+  /** "1 October 2026", for the not-open-yet notice. */
+  function longDate(iso) {
+    return new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', {
+      timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric',
+    });
+  }
+
   function renderRows(entries) {
     const tbody = $('lb-body');
     if (!entries.length) {
-      tbody.innerHTML = `<tr class="lb__empty"><td colspan="4">
-        No wagers recorded yet this cycle — be the first on the board.</td></tr>`;
+      // A board for a period before the competition opened says so, rather
+      // than inviting people to compete in something that is not running.
+      tbody.innerHTML = board?.startsOn
+        ? `<tr class="lb__empty"><td colspan="4">
+             The ${money.format(board.prizePool)} competition starts on
+             <strong>${escapeHtml(longDate(board.startsOn))}</strong>. Wagers
+             from before then do not count.</td></tr>`
+        : `<tr class="lb__empty"><td colspan="4">
+             No wagers recorded yet this cycle — be the first on the board.</td></tr>`;
       return;
     }
     const cut = board?.boardSize || 25;
@@ -533,6 +547,26 @@
     $('scope-weekly').addEventListener('click', () => setScope('weekly'));
     $('history-select').addEventListener('change', () => showPeriod($('history-select').value));
   }
+
+  /* ---------- Rules popup --------------------------------------------- */
+
+  /* A native <dialog> so Escape, the backdrop and focus handling come for
+     free. showModal() is unavailable on very old browsers, in which case the
+     rules are still in the page and simply shown inline rather than modally. */
+  const rules = $('rules-dialog');
+  $('rules-btn').addEventListener('click', () => {
+    if (typeof rules.showModal === 'function') rules.showModal();
+    else rules.setAttribute('open', '');
+  });
+  $('rules-close').addEventListener('click', () => {
+    if (typeof rules.close === 'function') rules.close();
+    else rules.removeAttribute('open');
+  });
+  // Clicking the backdrop closes it. The dialog's own box swallows its clicks,
+  // so a click that lands on the element itself came from outside the box.
+  rules.addEventListener('click', (e) => {
+    if (e.target === rules && typeof rules.close === 'function') rules.close();
+  });
 
   loadBoard();
   wireTabs();

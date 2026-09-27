@@ -76,7 +76,10 @@
 
   <section id="leaderboard" class="board">
     <div class="section-head">
-      <h2 id="board-title">Current leaderboard</h2>
+      <h2 id="board-title">Current leaderboard
+        <button class="info" id="rules-btn" type="button"
+                aria-label="Leaderboard rules" title="Leaderboard rules">i</button>
+      </h2>
       <p class="section-sub" id="board-sub">Search below to find your own position.</p>
     </div>
 
@@ -151,6 +154,39 @@
     </ol>
     <a class="btn btn--accent2 btn--lg" href="https://rainbet.com?r=woz" target="_blank" rel="noopener nofollow">Claim code WOZ →</a>
   </section>
+
+  <dialog class="rules" id="rules-dialog" aria-labelledby="rules-title">
+    <div class="rules__head">
+      <h2 id="rules-title">Leaderboard rules</h2>
+      <button class="rules__close" id="rules-close" type="button" aria-label="Close">&times;</button>
+    </div>
+    <ol class="rules__list">
+      <li><strong>How your wagers count.</strong> The board runs on a <strong>weighted
+        wager</strong>, not your raw wager amount. Games are weighted by their RTP:
+        <ul class="rules__sub">
+          <li>A game at <strong>96% RTP counts in full</strong> — $1 wagered is $1 towards the board.</li>
+          <li>A game <strong>above 96% RTP counts less</strong>, scaled to its RTP. For example a
+            <strong>99% RTP</strong> game counts about <strong>25%</strong>, and a
+            <strong>99.6% RTP</strong> game about <strong>10%</strong>.</li>
+          <li><strong>Sports bets count triple</strong> — $1 wagered counts as $3.</li>
+        </ul>
+      </li>
+      <li><strong>Who counts.</strong> Only players signed up to Rainbet under code
+        <strong>WOZ</strong> appear on the board.</li>
+      <li><strong>The period.</strong> Calendar month — 1st to the last day of the month. Resets at midnight UK time on the 1st.</li>
+      <li><strong>The prizes.</strong> $250 shared across the top 5 wagerers —
+        1st $100 · 2nd $60 · 3rd $40 · 4th $30 · 5th $20.</li>
+      <li><strong>Ranking.</strong> Highest weighted wager takes 1st, and so on down. A place with
+        nobody in it pays nothing and shows a dash.</li>
+      <li><strong>When it updates.</strong> Refreshed automatically every midnight UK time, straight from Rainbet's official
+        affiliate data. The board can be a few hours behind your latest play.</li>
+      <li><strong>Final standings.</strong> Totals are taken from Rainbet at the moment the period
+        closes, and those figures are final. Closed periods stay on the site under
+        <strong>Past winners</strong>.</li>
+      <li><strong>Getting paid.</strong> Winners are announced live on stream at the start of each month.</li>
+    </ol>
+    <p class="rules__foot">Please gamble responsibly. 18+ only.</p>
+  </dialog>
 
   <section id="socials" class="socials">
     <div class="section-head"><h2>Follow WozBets</h2><p class="section-sub">Catch the streams and the giveaways.</p></div>
