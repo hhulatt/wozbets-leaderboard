@@ -15,58 +15,58 @@
     20
   ],
   "boardSize": 25,
-  "totalWagered": 7862.56,
+  "totalWagered": 8653.22,
   "playerCount": 11,
-  "cacheUpdatedAt": "2026-09-28 04:54:57",
-  "updatedAt": "2026-09-28T04:54:57.620Z",
+  "cacheUpdatedAt": "2026-09-29 02:32:42",
+  "updatedAt": "2026-09-29T02:32:42.791Z",
   "entries": [
     {
       "rank": 1,
       "masked": "trip 101",
       "hash": "80bd58bf4abf215d",
-      "wagered": 4557.51,
+      "wagered": 4558.38,
       "prize": 100
     },
     {
       "rank": 2,
       "masked": "Lukasmelragi",
       "hash": "eabceac2d4d5f653",
-      "wagered": 1340.83,
+      "wagered": 1431.22,
       "prize": 60
     },
     {
       "rank": 3,
       "masked": "LuukF",
       "hash": "89878f10bfbb7dd4",
-      "wagered": 744.73,
+      "wagered": 762.75,
       "prize": 40
     },
     {
       "rank": 4,
-      "masked": "lemomLUTONTOWN",
-      "hash": "b119ec40e087c059",
-      "wagered": 462.21,
+      "masked": "2s1mpletrxstan",
+      "hash": "0334ead642392576",
+      "wagered": 709.73,
       "prize": 30
     },
     {
       "rank": 5,
-      "masked": "2s1mpletrxstan",
-      "hash": "0334ead642392576",
-      "wagered": 435.23,
+      "masked": "lemomLUTONTOWN",
+      "hash": "b119ec40e087c059",
+      "wagered": 462.26,
       "prize": 20
     },
     {
       "rank": 6,
-      "masked": "saberelijahwoz",
-      "hash": "91503a274fef0cb4",
-      "wagered": 208.5,
+      "masked": "Thijspenisgok",
+      "hash": "2e601110e5e2654f",
+      "wagered": 451.55,
       "prize": 0
     },
     {
       "rank": 7,
-      "masked": "Thijspenisgok",
-      "hash": "2e601110e5e2654f",
-      "wagered": 44.74,
+      "masked": "saberelijahwoz",
+      "hash": "91503a274fef0cb4",
+      "wagered": 208.5,
       "prize": 0
     },
     {
