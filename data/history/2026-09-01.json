@@ -1,0 +1,101 @@
+{
+  "cycle": "2026-09-01",
+  "periodStart": "2026-09-01",
+  "periodEnd": "2026-09-30",
+  "cycleMode": "monthly",
+  "cycleStartDay": 1,
+  "timezone": "Europe/London",
+  "fullUsernames": true,
+  "prizePool": 250,
+  "prizes": [
+    100,
+    60,
+    40,
+    30,
+    20
+  ],
+  "boardSize": 25,
+  "totalWagered": 9211.62,
+  "playerCount": 11,
+  "cacheUpdatedAt": "2026-10-01 01:58:29",
+  "updatedAt": "2026-10-01T01:58:29.873Z",
+  "entries": [
+    {
+      "rank": 1,
+      "masked": "trip 101",
+      "hash": "80bd58bf4abf215d",
+      "wagered": 4703.81,
+      "prize": 100
+    },
+    {
+      "rank": 2,
+      "masked": "Lukasmelragi",
+      "hash": "eabceac2d4d5f653",
+      "wagered": 1436.79,
+      "prize": 60
+    },
+    {
+      "rank": 3,
+      "masked": "Thijspenisgok",
+      "hash": "2e601110e5e2654f",
+      "wagered": 816.63,
+      "prize": 40
+    },
+    {
+      "rank": 4,
+      "masked": "LuukF",
+      "hash": "89878f10bfbb7dd4",
+      "wagered": 804.71,
+      "prize": 30
+    },
+    {
+      "rank": 5,
+      "masked": "2s1mpletrxstan",
+      "hash": "0334ead642392576",
+      "wagered": 710.09,
+      "prize": 20
+    },
+    {
+      "rank": 6,
+      "masked": "lemomLUTONTOWN",
+      "hash": "b119ec40e087c059",
+      "wagered": 462.27,
+      "prize": 0
+    },
+    {
+      "rank": 7,
+      "masked": "saberelijahwoz",
+      "hash": "91503a274fef0cb4",
+      "wagered": 208.5,
+      "prize": 0
+    },
+    {
+      "rank": 8,
+      "masked": "Khapitar57",
+      "hash": "b2371a80bcf733be",
+      "wagered": 28.38,
+      "prize": 0
+    },
+    {
+      "rank": 9,
+      "masked": "LSmith51",
+      "hash": "b61e769c875dbbaa",
+      "wagered": 25.99,
+      "prize": 0
+    },
+    {
+      "rank": 10,
+      "masked": "Albawoz",
+      "hash": "b6ae3e30f69d9121",
+      "wagered": 11.94,
+      "prize": 0
+    },
+    {
+      "rank": 11,
+      "masked": "rohit105",
+      "hash": "cc60a5e8dc3d23e3",
+      "wagered": 2.51,
+      "prize": 0
+    }
+  ]
+}
