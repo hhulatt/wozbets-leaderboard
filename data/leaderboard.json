@@ -15,10 +15,10 @@
     20
   ],
   "boardSize": 25,
-  "totalWagered": 3761.62,
-  "playerCount": 6,
-  "cacheUpdatedAt": "2026-10-03 01:51:19",
-  "updatedAt": "2026-10-03T01:51:19.279Z",
+  "totalWagered": 3761.8,
+  "playerCount": 7,
+  "cacheUpdatedAt": "2026-10-03 04:53:10",
+  "updatedAt": "2026-10-03T04:53:10.952Z",
   "entries": [
     {
       "rank": 1,
@@ -60,6 +60,13 @@
       "masked": "lemomLUTONTOWN",
       "hash": "b119ec40e087c059",
       "wagered": 5.03,
+      "prize": 0
+    },
+    {
+      "rank": 7,
+      "masked": "Khapitar57",
+      "hash": "b2371a80bcf733be",
+      "wagered": 0.18,
       "prize": 0
     }
   ]
